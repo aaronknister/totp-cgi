@@ -85,7 +85,7 @@ class GAUserSecret:
         self.scratch_tokens = []
         self.counter = -1
         self.issued_at = -1
-        self.max_token_age = -1
+        self.max_age = -1
 
         # This should immediately tell us if there are problems with the
         # secret as read from the file.
@@ -118,22 +118,22 @@ class GAUserSecret:
 
     def verify_token(self, token, ignore_age=False):
         if not ignore_age:
-            if self.max_token_age == -1:
+            if self.max_age == -1:
                 # Token never expires
                 pass
-            elsif self.max_token_age == 0:
+            elsif self.max_age == 0:
                 return False, 'Token has expired'
-            elsif self.max_token_age > 0:
+            elsif self.max_age > 0:
                if self.issued_at == -1:
                     # Token doesn't have an issueance date
                     pass
                 else:
                     time_delta = self.timestamp - self.issued_at
-                    max_delta = self.max_token_age * 24 * 60 * 60
+                    max_delta = self.max_age * 24 * 60 * 60
                     if ( time_delta > max_delta ):
                         return False, 'Token has expired'
             else:
-                raise UserSecretError('Unknown value for token age: %s' % self.max_token_age)
+                raise UserSecretError('Unknown value for token age: %s' % self.max_age)
 
         if self.counter < 0:
             logger.debug('Verifying as TOTP')
