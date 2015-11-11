@@ -60,7 +60,7 @@ def hash_pincode(pincode, algo='bcrypt'):
     return passlib.hash.bcrypt.encrypt(pincode)
 
 
-def generate_secret(rate_limit=(3, 30), window_size=3, scratch_tokens=5, bs=80):
+def generate_secret(rate_limit=(3, 30), window_size=3, scratch_tokens=5, bs=80, max_age=-1):
     # os.urandom expects bytes, so we divide by 8
     secret = base64.b32encode(os.urandom(bs/8))
 
@@ -68,6 +68,7 @@ def generate_secret(rate_limit=(3, 30), window_size=3, scratch_tokens=5, bs=80):
 
     gaus.rate_limit = rate_limit
     gaus.window_size = window_size
+    gaus.max_age = max_age
 
     for i in xrange(scratch_tokens):
         token = string.zfill(struct.unpack('I', os.urandom(4))[0], 8)[-8:]
