@@ -196,6 +196,7 @@ def generate_secret(config):
     encrypt_secret = config.getboolean('secret', 'encrypt_secret')
     window_size = config.getint('secret', 'window_size')
     rate_limit = config.get('secret', 'rate_limit')
+    max_age = config.get('secret', 'max_age') 
 
     try:
         secret_bits = config.getint('secret', 'bits')
@@ -212,7 +213,7 @@ def generate_secret(config):
     rate_limit = (int(times), int(secs))
 
     gaus = totpcgi.utils.generate_secret(rate_limit, window_size, 
-        scratch_tokens_n, bs=secret_bits)
+        scratch_tokens_n, bs=secret_bits, max_age=max_age)
 
     return gaus
 
