@@ -277,6 +277,10 @@ def cgimain():
         user    = form.getfirst('username')
         pincode = form.getfirst('pincode')
 
+    # Validate the pincode if we're not relying on http auth
+    # or if we're encrypting the secret, because in this case
+    # we need to verify the pincode regardless.
+    if not trust_http_auth or encrypt_secret:
         # start by verifying the pincode
         try:
             backends.pincode_backend.verify_user_pincode(user, pincode)
