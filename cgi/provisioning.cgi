@@ -218,6 +218,8 @@ def generate_secret(config):
 
 
 def cgimain():
+    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
+
     try:
         trust_http_auth = config.getboolean('secret', 'trust_http_auth')
     except ConfigParser.NoOptionError:
@@ -237,6 +239,8 @@ def cgimain():
     if trust_http_auth and os.environ.has_key('REMOTE_USER'):
         user = os.environ['REMOTE_USER']
         if 'pincode' not in form:
+            if encrypt_secret:
+                bad_request(config, 'Pincode required for secret encryption, but none provided')
             pincode = None
         else:
             pincode = form.getfirst('pincode')
@@ -312,7 +316,6 @@ def cgimain():
     gaus = generate_secret(config)
 
     # if we don't need to encrypt the secret, set pincode to None
-    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
     if not encrypt_secret:
         pincode = None
 
