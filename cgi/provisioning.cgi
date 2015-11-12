@@ -147,6 +147,8 @@ def show_pincode_form(config):
     sys.stdout.write('Content-Length: %s\n' % len(out))
     sys.stdout.write('\n')
 
+    sys.stdout.write(out)
+    sys.exit(0)
 
 def show_reissue_page(config, user):
     templates_dir = config.get('secret', 'templates_dir')
