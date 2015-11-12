@@ -129,6 +129,25 @@ def show_login_form(config):
     sys.stdout.write(out)
     sys.exit(0)
 
+def show_pincode_form(config):
+    templates_dir = config.get('secret', 'templates_dir')
+    fh = open(os.path.join(templates_dir, 'pincode.html'))
+    tpt = Template(fh.read())
+    fh.close()
+
+    vals = {
+            'action_url':   config.get('secret', 'action_url'),
+            'css_root':     config.get('secret', 'css_root'),
+    }
+
+    out = tpt.safe_substitute(vals)
+
+    sys.stdout.write('Status: 200 OK\n')
+    sys.stdout.write('Content-type: text/html\n')
+    sys.stdout.write('Content-Length: %s\n' % len(out))
+    sys.stdout.write('\n')
+
+
 def show_reissue_page(config, user):
     templates_dir = config.get('secret', 'templates_dir')
     fh = open(os.path.join(templates_dir, 'reissue.html'))
@@ -240,7 +259,7 @@ def cgimain():
         user = os.environ['REMOTE_USER']
         if 'pincode' not in form:
             if encrypt_secret:
-                bad_request(config, 'Pincode required for secret encryption, but none provided')
+                show_pincode_form(config)
             pincode = None
         else:
             pincode = form.getfirst('pincode')
