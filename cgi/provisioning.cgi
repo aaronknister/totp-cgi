@@ -155,9 +155,36 @@ def show_pincode_form(config):
     sys.stdout.write(out)
     sys.exit(0)
 
-def show_reissue_page(config, user):
+def show_pincode_change_form(config, user):
     templates_dir = config.get('secret', 'templates_dir')
-    fh = open(os.path.join(templates_dir, 'reissue.html'))
+    fh = open(os.path.join(templates_dir, 'pincode_change.html'))
+    tpt = Template(fh.read())
+    fh.close()
+
+    vals = {
+            'action_url':   config.get('secret', 'action_url'),
+            'css_root':     config.get('secret', 'css_root'),
+            'username':     user,
+    }
+
+    out = tpt.safe_substitute(vals)
+    
+    sys.stdout.write('Status: 200 OK\n')
+    sys.stdout.write('Content-type: text/html\n')
+    sys.stdout.write('Content-Length: %s\n' % len(out))
+    sys.stdout.write('\n')
+
+    sys.stdout.write(out)
+    sys.exit(0)
+
+def show_reissue_page(config, user, with_pinchange=False):
+    templates_dir = config.get('secret', 'templates_dir')
+    template = 'reissue.html'
+
+    if with_pinchange:
+       template = 'reissue_pinchange.html'
+
+    fh = open(os.path.join(templates_dir, template))
     tpt = Template(fh.read())
     fh.close()
 
@@ -250,17 +277,7 @@ def generate_secret(config):
 
     return gaus
 
-
-def cgimain():
-    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
-
-    try:
-        trust_http_auth = config.getboolean('secret', 'trust_http_auth')
-    except ConfigParser.NoOptionError:
-        trust_http_auth = False
-
-    form = cgi.FieldStorage()
-
+def _handle_qr_code(form, trust_http_auth):
     if 'qrcode' in form:
         if not trust_http_auth and os.environ['HTTP_REFERER'].find(os.environ['SERVER_NAME']) == -1:
             bad_request(config, 'Sorry, you failed the HTTP_REFERER check')
@@ -268,8 +285,7 @@ def cgimain():
         qrcode = form.getfirst('qrcode')
         show_qr_code(qrcode)
 
-    remote_host = os.environ['REMOTE_ADDR']
-
+def _handle_http_auth(form, trust_http_auth, remote_host, encrypt_secret):
     if trust_http_auth and os.environ.has_key('REMOTE_USER'):
         user = os.environ['REMOTE_USER']
         if 'pincode' not in form:
@@ -282,7 +298,11 @@ def cgimain():
         syslog.syslog(syslog.LOG_NOTICE,
             'Using trust-http-auth for user=%s, host=%s' % (user, remote_host))
 
-    else:
+        return (True, user, pincode)
+
+    return (False, )
+
+def _handle_form_auth(form):
         must_keys = ('username', 'pincode')
 
         for must_key in must_keys:
@@ -292,22 +312,55 @@ def cgimain():
         user    = form.getfirst('username')
         pincode = form.getfirst('pincode')
 
+        return (True, user, pincode)
+
+def _verify_pincode(user, pincode, remote_host):
     # Validate the pincode if we're not relying on http auth
     # or if we're encrypting the secret, because in this case
     # we need to verify the pincode regardless.
-    if not trust_http_auth or encrypt_secret:
-        # start by verifying the pincode
-        try:
-            backends.pincode_backend.verify_user_pincode(user, pincode)
-        except Exception, ex:
-            syslog.syslog(syslog.LOG_NOTICE,
-                'Failure: user=%s, host=%s, message=%s' % (user, remote_host,
-                    str(ex)))
-            bad_request(config, str(ex))
+    # start by verifying the pincode
+    try:
+        backends.pincode_backend.verify_user_pincode(user, pincode)
+    except Exception, ex:
+        syslog.syslog(syslog.LOG_NOTICE,
+            'Failure: user=%s, host=%s, message=%s' % (user, remote_host,
+                str(ex)))
+        bad_request(config, str(ex))
 
         # pincode verified
-        syslog.syslog(syslog.LOG_NOTICE,
-            'Success: user=%s, host=%s' % (user, remote_host)) 
+    syslog.syslog(syslog.LOG_NOTICE,
+        'Success: user=%s, host=%s' % (user, remote_host)) 
+
+def cgimain():
+    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
+
+    try:
+        trust_http_auth = config.getboolean('secret', 'trust_http_auth')
+    except ConfigParser.NoOptionError:
+        trust_http_auth = False
+
+    try:
+        force_pinchange_on_reprovision = config.getboolean('secret', 'change_pincode_on_reprovision')
+    except ConfigParser.NoOptionError:
+        force_pinchange_on_reprovision = False
+
+    form = cgi.FieldStorage()
+
+    _handle_qr_code(form, trust_http_auth)
+
+    verify_pincode = False
+
+    if trust_http_auth or encrypt_secret:
+        verify_pincode = True
+
+    remote_host = os.environ['REMOTE_ADDR']
+
+    (res, user, pincode) = _handle_http_auth(form, trust_http_auth, remote_host, encrypt_secret)
+    if not res:
+        (res, user, pincode) = _handle_form_auth(form)
+
+    if verify_pincode:
+        _verify_pincode(user, pincode, remote_host)
 
     if 'action' in form:
         action = form.getfirst('action')
@@ -327,15 +380,44 @@ def cgimain():
 
     allow_reissue = config.getboolean('secret', 'allow_reissue')
 
+    next_action = None
     if exists and action != 'reissue':
         syslog.syslog(syslog.LOG_NOTICE,
             'Secret exists: user=%s, host=%s' % (user, remote_host))
         # make sure we're allowed to reissue tokens
         if allow_reissue:
-            show_reissue_page(config, user)
+            next_action='reissue'
         else:
             show_reissue_denied(config)
 
+
+    if force_pinchange_on_reprovision:
+            # make sure we got the attribute we wanted in the form, else show the reissue page
+        must_keys = ('new_pincode', 'confirm_new_pincode')
+
+        do_pinchange_form=False
+        for must_key in must_keys:
+            if must_key not in form:
+                if next_action == 'reissue':
+                    show_reissue_page(config, user, with_pinchange=True)
+                else:
+                    show_pincode_change_form(config, user)
+
+        new_pincode = form.getfirst('new_pincode')
+        confirm_new_pincode = form.getfirst('confirm_new_pincode')
+
+        if not len(new_pincode) > 0:
+            bad_request(config, 'New pincode not specified')
+
+        if new_pincode != confirm_new_pincode:
+            bad_request(config, 'New pincodes don\t match')
+
+        # update pincode here
+
+    else:
+        if next_action == 'reissue':
+            show_reissue_page(config, user, with_pinchange=False)
+        
     if action == 'reissue':
         # make sure we're allowed to reissue
         if not allow_reissue:
@@ -359,6 +441,8 @@ def cgimain():
         except Exception, ex:
             bad_request(config, 'Could not delete existing token for %s: %s'
                     % (user, str(ex)))
+            
+        
 
     # now generate the secret and store it
     gaus = generate_secret(config)
