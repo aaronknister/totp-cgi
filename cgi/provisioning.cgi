@@ -331,6 +331,17 @@ def _verify_pincode(user, pincode, remote_host):
     syslog.syslog(syslog.LOG_NOTICE,
         'Success: user=%s, host=%s' % (user, remote_host)) 
 
+def set_user_pincode(config, user, pincode):
+    usehash = config.get('pincode', 'usehash')
+    makedb  = config.getboolean('pincode', 'makedb')
+
+    hashcode = totpcgi.utils.hash_pincode(pincode, usehash)
+
+    backends.pincode_backend.save_user_hashcode(user, hashcode, makedb)
+    backends.pincode_backend.verify_user_pincode(user, pincode)
+
+    return pincode
+
 def cgimain():
     encrypt_secret = config.getboolean('secret', 'encrypt_secret')
 
@@ -413,6 +424,7 @@ def cgimain():
             bad_request(config, 'New pincodes don\t match')
 
         # update pincode here
+        set_user_pincode,config, user, pincode)
 
     else:
         if next_action == 'reissue':
