@@ -420,7 +420,7 @@ class GAUserConfigBackend(totpcgi.backends.GAUserConfigBackend):
     def _update_key(self, cur, userid, key, value):
         return cur.execute('''
             REPLACE INTO user_config (userid, key, value)
-                VALUES (%s, %s, %s''', (userid, key, value)
+                VALUES (%s, %s, %s)''', (userid, key, value))
 
     def update_user_config(self, user, gauc):
         logger.debug('Writing new config for user %s' % user)
