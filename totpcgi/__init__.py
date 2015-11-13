@@ -50,6 +50,11 @@ class UserPincodeError(exceptions.Exception):
         exceptions.Exception.__init__(self, message)
         logger.debug('!UserPincodeError: %s' % message)
 
+class UserConfigError(exceptions.Exception):
+    def __init__(self, message):
+        exceptions.Exception.__init__(self, message)
+        logger.debug('!UserConfigError: %s' % message)
+
 
 class VerifyFailed(exceptions.Exception):
     def __init__(self, message):
@@ -76,6 +81,12 @@ class GAUserState:
         self.used_scratch_tokens = []
         self.counter = -1
 
+class GAUserConfig:
+    def __init__(self):
+        self.allow_reissue = None
+        self.secret_max_age = None
+        self.account_expiration_date = None
+        self.change_pincode_next_provision = None
 
 class GAUserSecret:
     def __init__(self, secret):

@@ -389,3 +389,14 @@ class GAStateBackend(totpcgi.backends.GAStateBackend):
         if os.access(state_file, os.W_OK):
             os.unlink(state_file)
             logger.debug('Removed user state file: %s' % state_file)
+
+class GAUserConfigBackend(totpcgi.backends.GAUserConfigBackend):
+
+    def get_user_state(self, user):
+        return totpcgi.GAUserConfig()
+
+    def update_user_state(self, user, state):
+        raise totpcgi.UserConfigError("Updating user configuration not (yet) supported by the file backend")
+
+    def delete_user_state(self, user):
+        raise totpcgi.UserConfigError("Deleting user configuration not (yet) supported by the file backend")

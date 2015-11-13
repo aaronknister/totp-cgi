@@ -180,3 +180,16 @@ class GAPincodeBackend:
 
         except ValueError:
             raise totpcgi.UserPincodeError('Unsupported hashcode format')
+
+class GAUserConfigBackend:
+    def __init__(self):
+        pass
+
+    def get_user_config(self, user):
+        pass
+
+    def update_user_config(self, user, gauc):
+        pass
+
+    def delete_user_config(self, user):
+        pass

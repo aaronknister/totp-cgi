@@ -371,3 +371,90 @@ class GAPincodeBackend(totpcgi.backends.GAPincodeBackend):
     def delete_user_hashcode(self, user):
         self._delete_user_hashcode(user)
         self.conn.commit()
+
+class GAUserConfigBackend(totpcgi.backends.GAUserConfigBackend):
+    def __init__(self, connect_host, connect_user, connect_password, connect_db):
+        totpcgi.backends.GAPincodeBackend.__init__(self)
+        logger.debug('Using MySQL User Configuration backend')
+
+        logger.debug('Establishing connection to the database')
+        self.conn = db_connect(connect_host, connect_user, connect_password, connect_db)
+
+        self.locks = {}
+        self._valid_keys = ['allow_reissue', 'secret_max_age', 'account_expiration_date', 'change_pincode_next_provision' ]
+
+    def get_user_config(self, user):
+        logger.debug('Getting config for user %s' % user)
+
+        userid = get_user_id(self.conn, user)
+
+        gauc = GAUserConfig()
+
+        logger.debug('Creating advisory config lock for userid=%s' % userid)
+
+        cur = self.conn.cursor()
+        # Attempt to namespace the lock, prefixing with a -
+        # since apparently according to the POSIX spec a username should
+        # not start with a -. This should avoid a lock name conflict with
+        # the state backend
+        cur.execute('SELECT pg_advisory_lock(-userconfig-%s)', (userid,))
+        self.locks[user] = userid
+
+        cur.execute('''
+            SELECT c.key, c.value
+              FROM user_config AS c
+              JOIN users AS u USING (userid)
+             WHERE u.username = %s''', (user,))
+
+        # get all key value pairs
+        for (key, value) in cur.fetchall():
+            # if this isn't a valid key then balk
+            if not key in self._valid_keys:
+                raise UserConfigError("Unknown key '%s' for user '%s'" % (key, user))
+
+            # set this attribute on the user config class
+            setattr(guac, key, value)
+
+	return gauc
+
+    def _update_key(self, cur, userid, key, value):
+        return cur.execute('''
+            REPLACE INTO user_config (userid, key, value)
+                VALUES (%s, %s, %s''', (userid, key, value)
+
+    def update_user_config(self, user, gauc):
+        logger.debug('Writing new config for user %s' % user)
+
+        if user not in self.locks.keys():
+            raise totpcgi.UserConfigError("%s's MySQL config lock has gone away!" % user)
+
+        userid = self.locks[user]
+
+        cur = self.conn.cursor()
+
+        for key in self._valid_keys:
+            value = getattr(quac, key)
+
+            if value != None:
+                logger.debug('Updating config attribute %s for user %s' % (key, user))
+                self._update_key(cur, userid, key, value)
+            else:
+                logger.debug('Not updating undefined config attribute %s for user %s' % (key, user))
+
+        logger.debug('Unlocking advisory config lock for userid=%s' % userid)
+        cur.execute('SELECT pg_advisory_unlock(%s)', (userid,))
+
+        self.conn.commit()
+
+        del self.locks[user]
+
+    def delete_user_config(self, user):
+        logger.debug('Deleting config for user %s' % user)
+
+        userid = get_user_id(self.conn, user)
+
+        cur.execute('''
+            DELETE FROM user_config
+                  WHERE userid=%s''' % (userid,))
+
+        self.conn.commit()

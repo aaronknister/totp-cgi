@@ -76,3 +76,8 @@ class GAStateBackend:
     def __init__(self):
         raise totpcgi.backends.BackendNotSupported(
             'State backend not supported by ldap backend engine')
+
+class GAUserConfigBackend:
+    def __init__(self):
+        raise totpcgi.backends.BackendNotSupported(
+            'User config backend not supported by ldap backend engine')
