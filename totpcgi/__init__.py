@@ -84,6 +84,7 @@ class GAUserSecret:
         self.window_size = 3
         self.scratch_tokens = []
         self.counter = -1
+        self.issue_timestamp = 0
 
         # This should immediately tell us if there are problems with the
         # secret as read from the file.

@@ -68,6 +68,7 @@ CREATE TABLE secrets (
     rate_limit_times   INTEGER DEFAULT 3,
     rate_limit_seconds INTEGER DEFAULT 30,
     window_size        INTEGER DEFAULT 0,
+    issue_timestamp    INTEGER DEFAULT 0,
     CONSTRAINT secrets_uniq UNIQUE (userid)
 );
 GRANT SELECT                         ON secrets TO totpcgi;

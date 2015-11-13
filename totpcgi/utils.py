@@ -22,6 +22,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import time
 
 import string
 import struct
@@ -68,6 +69,7 @@ def generate_secret(rate_limit=(3, 30), window_size=3, scratch_tokens=5, bs=80):
 
     gaus.rate_limit = rate_limit
     gaus.window_size = window_size
+    gaus.issue_timestamp = int(time.time())
 
     for i in xrange(scratch_tokens):
         token = string.zfill(struct.unpack('I', os.urandom(4))[0], 8)[-8:]

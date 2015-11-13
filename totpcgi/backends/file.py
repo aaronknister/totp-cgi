@@ -215,6 +215,8 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
                         gaus.set_hotp(0)
 
                     logger.debug('hotp_counter=%s' % gaus.counter)
+                elif line[2:22] == 'TOTPCGI_ISSUE_TIME':
+                    gaus.issue_timestamp = int(line[23:])
 
             # Scratch code tokens are 8-digit
             # We ignore scratch tokens if we're using encrypted secret
@@ -261,6 +263,7 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
         else:
             fh.write('" DISALLOW_REUSE\n')
             fh.write('" TOTP_AUTH\n')
+        fh.write('" TOTPCGI_ISSUE_TIME %s\n' % gaus.issue_timestamp)
 
         if pincode is None:
             fh.write('\n'.join(gaus.scratch_tokens))
