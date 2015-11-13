@@ -366,6 +366,8 @@ def cgimain():
 
     remote_host = os.environ['REMOTE_ADDR']
 
+    new_pincode = None
+
     (res, user, pincode) = _handle_http_auth(form, trust_http_auth, remote_host, encrypt_secret)
     if not res:
         (res, user, pincode) = _handle_form_auth(form)
@@ -423,9 +425,6 @@ def cgimain():
         if new_pincode != confirm_new_pincode:
             bad_request(config, 'New pincodes don\t match')
 
-        # update pincode here
-        set_user_pincode,config, user, pincode)
-
     else:
         if next_action == 'reissue':
             show_reissue_page(config, user, with_pinchange=False)
@@ -453,8 +452,6 @@ def cgimain():
         except Exception, ex:
             bad_request(config, 'Could not delete existing token for %s: %s'
                     % (user, str(ex)))
-            
-        
 
     # now generate the secret and store it
     gaus = generate_secret(config)
@@ -462,6 +459,11 @@ def cgimain():
     # if we don't need to encrypt the secret, set pincode to None
     if not encrypt_secret:
         pincode = None
+
+    # change the pincode
+    if force_pinchange_on_reprovision:
+        set_user_pincode(config, user, new_pincode)
+        pincode = new_pincode
 
     backends.secret_backend.save_user_secret(user, gaus, pincode)
 
