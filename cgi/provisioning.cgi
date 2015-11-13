@@ -134,6 +134,27 @@ def show_login_form(config):
     sys.stdout.write(out)
     sys.exit(0)
 
+def show_pincode_form(config):
+    templates_dir = config.get('secret', 'templates_dir')
+    fh = open(os.path.join(templates_dir, 'pincode.html'))
+    tpt = Template(fh.read())
+    fh.close()
+
+    vals = {
+            'action_url':   config.get('secret', 'action_url'),
+            'css_root':     config.get('secret', 'css_root'),
+    }
+
+    out = tpt.safe_substitute(vals)
+
+    sys.stdout.write('Status: 200 OK\n')
+    sys.stdout.write('Content-type: text/html\n')
+    sys.stdout.write('Content-Length: %s\n' % len(out))
+    sys.stdout.write('\n')
+
+    sys.stdout.write(out)
+    sys.exit(0)
+
 def show_reissue_page(config, user):
     templates_dir = config.get('secret', 'templates_dir')
     fh = open(os.path.join(templates_dir, 'reissue.html'))
@@ -231,6 +252,8 @@ def generate_secret(config):
 
 
 def cgimain():
+    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
+
     try:
         trust_http_auth = config.getboolean('secret', 'trust_http_auth')
     except ConfigParser.NoOptionError:
@@ -250,6 +273,8 @@ def cgimain():
     if trust_http_auth and os.environ.has_key('REMOTE_USER'):
         user = os.environ['REMOTE_USER']
         if 'pincode' not in form:
+            if encrypt_secret:
+                show_pincode_form(config)
             pincode = None
         else:
             pincode = form.getfirst('pincode')
@@ -267,6 +292,10 @@ def cgimain():
         user    = form.getfirst('username')
         pincode = form.getfirst('pincode')
 
+    # Validate the pincode if we're not relying on http auth
+    # or if we're encrypting the secret, because in this case
+    # we need to verify the pincode regardless.
+    if not trust_http_auth or encrypt_secret:
         # start by verifying the pincode
         try:
             backends.pincode_backend.verify_user_pincode(user, pincode)
@@ -335,7 +364,6 @@ def cgimain():
     gaus = generate_secret(config)
 
     # if we don't need to encrypt the secret, set pincode to None
-    encrypt_secret = config.getboolean('secret', 'encrypt_secret')
     if not encrypt_secret:
         pincode = None
 
