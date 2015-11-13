@@ -219,7 +219,8 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
             SELECT s.secret, 
                    s.rate_limit_times, 
                    s.rate_limit_seconds, 
-                   s.window_size
+                   s.window_size,
+                   s.issue_timestamp
               FROM secrets AS s 
               JOIN users AS u USING (userid)
              WHERE u.username = %s''', (user,))
@@ -228,7 +229,7 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
         if not row:
             raise totpcgi.UserNotFound('no secrets record for %s' % user)
 
-        (secret, rate_limit_times, rate_limit_seconds, window_size) = row
+        (secret, rate_limit_times, rate_limit_seconds, window_size, issue_timestamp) = row
 
         using_encrypted_secret = False
         if secret.find('aes256+hmac256') == 0 and pincode is not None:
@@ -254,6 +255,8 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
             row = cur.fetchone()
             if row:
                 gaus.set_hotp(row[0])
+
+        gaus.issue_timestamp = issue_timestamp
 
         # Not loading scratch tokens if using encrypted secret
         if using_encrypted_secret:
@@ -287,9 +290,9 @@ class GASecretBackend(totpcgi.backends.GASecretBackend):
         cur.execute('''
             INSERT INTO secrets 
                         (userid, secret, rate_limit_times,
-                         rate_limit_seconds, window_size)
-                 VALUES (%s, %s, %s, %s, %s)''', 
-                    (userid, secret, gaus.rate_limit[0], gaus.rate_limit[1], gaus.window_size))
+                         rate_limit_seconds, window_size, issue_timestamp)
+                 VALUES (%s, %s, %s, %s, %s, %s)''', 
+                    (userid, secret, gaus.rate_limit[0], gaus.rate_limit[1], gaus.window_size, gaus.issue_timestamp))
 
         for token in gaus.scratch_tokens:
             cur.execute('''
